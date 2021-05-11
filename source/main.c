@@ -141,9 +141,43 @@ void BlinkingLED(){
     
 }
 
+
+unsigned char sound_status;
+enum Sound_States {Sound_Start, Sound_Off, Sound_On} Sound_State;
+
+void Sound(){
+    
+    switch(Sound_State){
+        case Sound_Start:
+            Sound_State = Sound_Off;
+            break;
+        
+        case Sound_Off:
+            Sound_State = Sound_On;
+            break;
+            
+        case Sound_On:
+            Sound_State = Sound_Off;
+            break;
+        default:
+            Sound_State = Sound_Start;
+    }
+    
+    
+    switch(Sound_State){
+        case Sound_Off:
+            sound_status = 0x00;
+            break;
+        case Sound_On:
+            sound_status = 0x10;
+            break;
+    }
+    
+}
+
+
+
 enum Combine_States {Combine_Start, Combine_All} Combine_State;
-
-
 void Combine(){
     
     switch(Combine_State){
@@ -161,7 +195,7 @@ void Combine(){
     // Actions
      switch(Combine_State){
         case Combine_All:
-            PORTB = threeLEDs | blinkingLED;
+            PORTB = threeLEDs | blinkingLED | sound_status;
             break;
         
     }
@@ -178,8 +212,9 @@ int main(void) {
     
     unsigned long ThreeLED_time = 300;
     unsigned long BlinkLED_time = 1000;
-    
-    TimerSet(100);
+    unsigned long Sound_time = 150;    
+
+    TimerSet(1);
     TimerOn();
     
     ThreeLED_State = ThreeLED_Start;
@@ -195,13 +230,18 @@ int main(void) {
             BlinkingLED();
             BlinkLED_time = 0;
         }
-        
+        if(Sound_time >= 150){
+	    Sound();
+	    Sound_time=0;
+	}
+	
         Combine();
         
         while(!TimerFlag);
             TimerFlag = 0;
-	    ThreeLED_time +=100;
-	    BlinkLED_time +=100; 
+	    ThreeLED_time +=1;
+	    BlinkLED_time +=1;
+	    Sound_time +=1; 
 
    }
     return 1;
