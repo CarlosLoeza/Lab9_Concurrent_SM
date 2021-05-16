@@ -14,6 +14,12 @@
 #endif
 
 
+// Timer for our SynchSM
+unsigned long ThreeLED_time = 300;
+unsigned long BlinkLED_time = 1000;
+unsigned long Sound_time = 150; 
+
+
 volatile unsigned char TimerFlag = 0; // TimerISR() sets this to 1. C programmer should clea$
 
 // Internal variables for mapping AVR's ISR to our cleaner TimerISR model.
@@ -69,7 +75,10 @@ void TimerSet(unsigned long M){
     _avr_timer_cntcurr =  _avr_timer_M;
 }
 
+
+
 unsigned char threeLEDs;
+unsigned char button;
 
 enum ThreeLED_States {ThreeLED_Start, ThreeLED_B0, ThreeLED_B1, ThreeLED_B2} ThreeLED_State;
 
@@ -153,12 +162,29 @@ void Sound(){
             break;
         
         case Sound_Off:
-            Sound_State = Sound_On;
-            break;
+            if(button == 0x04 && Sound_time < 2){
+		Sound_State = Sound_On;
+		sound_status = 0x10;
+            }
+            else if(button  == 0x04 && Sound_time <4){
+		Sound_State = Sound_Off;
+		sound_status = 0x00;
+	    }
+	    break;
             
         case Sound_On:
-            Sound_State = Sound_Off;
+	    if(button == 0x04 && Sound_time < 2){
+                Sound_State = Sound_On;
+                sound_status = 0x10;
+            }
+            else if(button  == 0x04 && Sound_time <4){
+                Sound_State = Sound_Off;
+                sound_status = 0x00;
+            }
+
             break;
+
+
         default:
             Sound_State = Sound_Start;
     }
@@ -208,11 +234,10 @@ void Combine(){
 int main(void) {
 /* Insert DDR and PORT initializations */
     DDRB = 0xFF; PORTB = 0x00;
+    DDRA = 0x00; PORTA = 0x04;
     
-    
-    unsigned long ThreeLED_time = 300;
-    unsigned long BlinkLED_time = 1000;
-    unsigned long Sound_time = 150;    
+
+    button = ~PINA & 0x04;
 
     TimerSet(1);
     TimerOn();
@@ -230,7 +255,7 @@ int main(void) {
             BlinkingLED();
             BlinkLED_time = 0;
         }
-        if(Sound_time >= 150){
+        if(Sound_time >= 3){
 	    Sound();
 	    Sound_time=0;
 	}
