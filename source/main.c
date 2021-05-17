@@ -13,7 +13,6 @@
 #include "simAVRHeader.h"
 #endif
 
-
 // Timer for our SynchSM
 unsigned long ThreeLED_time = 300;
 unsigned long BlinkLED_time = 1000;
@@ -25,6 +24,33 @@ volatile unsigned char TimerFlag = 0; // TimerISR() sets this to 1. C programmer
 // Internal variables for mapping AVR's ISR to our cleaner TimerISR model.
 unsigned long _avr_timer_M = 1; // Start counter from here to 0. Default 1ms
 unsigned long _avr_timer_cntcurr = 0; // Current internal clock of 1ms ticks
+
+void set_PWM(double frequency) {
+    static double current_frequency;
+
+    if(frequency != current_frequency){
+    if(!frequency) {TCCR3B &= 0x08;}
+    else{TCCR3B |= 0x03;}
+
+    if(frequency < 0.954) {OCR3A = 0xFFFF;}
+    else if(frequency > 31250) {OCR3A = 0x0000;}
+    else{OCR3A = (short)(8000000/(128*frequency)) - 1;}
+    TCNT3 = 0;
+    current_frequency = frequency;
+    }
+}
+
+void PWM_on(){
+    TCCR3A = (1 << COM3A0);
+    TCCR3B = (1 << WGM32) | (1 << CS31) | (1 << CS30);
+
+    set_PWM(0);
+}
+
+void PWM_off(){
+    TCCR3A = 0x00;
+    TCCR3B = 0x00;
+}
 
 void TimerOn(){
     // AVR timer/counter controller register TCCR1
@@ -153,7 +179,8 @@ void BlinkingLED(){
 
 unsigned char sound_status;
 unsigned char sound_count;
-enum Sound_States {Sound_Start, Sound_Wait, Sound_On, Sound_Off} Sound_State;
+unsigned char freq_count;
+enum Sound_States {Sound_Start, Sound_Wait, Sound_Increment, Sound_Decrement, Sound_On, Sound_Off} Sound_State;
 void Sound(){
     
     switch(Sound_State){
@@ -163,18 +190,58 @@ void Sound(){
             break;
         
         case Sound_Wait:
-            if(button){
+            if(button & 0x04){
                 Sound_State = Sound_On;
-            } else{
+            } else if(button & 0x01){
+	        Sound_State = Sound_Increment;
+	    } else if(button & 0x02){
+		Sound_State = Sound_Decrement;
+	    }
+	    else{
                 Sound_State = Sound_Wait;
             }
             sound_status = 0;
             break;
             
-            
+    	case Sound_Increment:
+	    Sound_State = Sound_Wait;
+	    break;
+
+	case Sound_Decrement:
+	    Sound_State = Sound_Wait;
+	    break;
+    	
         case Sound_On:
             if(button && (sound_count < Sound_time)){
-                Sound_State = Sound_On;
+                switch(freq_count){
+		    case 1: 
+			set_PWM(261.63); 
+			break;
+		    case 2: 
+			set_PWM(293.66); 
+			break;
+		    case 3: 
+			set_PWM(329.63); 
+			break;
+		    case 4: 
+			set_PWM(349.23);
+			 break;
+		    case 5: 
+			set_PWM(392.00); 
+			break;
+		    case 6: 
+			set_PWM(440.00);
+			break;
+		    case 7: 
+			set_PWM(493.88); 
+			break;
+	   	    case 8: 
+			set_PWM(500);
+			 break;
+		    default: 
+			break;
+		}
+		Sound_State = Sound_On;
                 sound_count++;
             } else if(button){
                 Sound_State = Sound_Off;
@@ -210,7 +277,19 @@ void Sound(){
         case Sound_On:
             sound_status = 0x10;
             break;
-    }
+	case Sound_Increment:
+            if(freq_count!= 8){
+                freq_count++;
+            }
+            break;
+        case Sound_Decrement:
+            if(freq_count != 1){
+                freq_count--;
+            }
+	    break;
+ 
+
+   }
     
 }
 
@@ -234,7 +313,9 @@ int main(void) {
     ThreeLED_State = ThreeLED_Start;
     BlinkLED_State = BlinkLED_Start;
     Sound_State = Sound_Start;
-    
+    freq_count =1;
+    PWM_on();
+    set_PWM(0);
     /* Insert your solution below */
     while (1) {
         
